@@ -5,8 +5,8 @@ import { useTheme } from 'next-themes';
 import dynamic from 'next/dynamic';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
-import { Lock, Unlock, Copy, Download, Loader2, ShieldCheck, Plus, Share2, Pencil, Save, X, Code2, Link as LinkIcon } from 'lucide-react';
-import { unlockPaste, updatePaste } from '@/app/actions/paste';
+import { Lock, Unlock, Copy, Download, Loader2, ShieldCheck, Plus, Share2, Pencil, Save, X, Code2, Link as LinkIcon, RefreshCcw } from 'lucide-react';
+import { unlockPaste, updatePaste, getPaste } from '@/app/actions/paste';
 import { toast } from 'sonner';
 import Link from 'next/link';
 import { Label } from '@/components/ui/label';
@@ -54,6 +54,7 @@ export default function PasteClientWrapper({ initialData, shortUrl }: { initialD
     const [isSaving, setIsSaving] = useState(false);
     const [editContent, setEditContent] = useState('');
     const [editLanguage, setEditLanguage] = useState('');
+    const [isRefreshing, setIsRefreshing] = useState(false);
 
     const { theme } = useTheme();
     const [mounted, setMounted] = useState(false);
@@ -151,6 +152,31 @@ export default function PasteClientWrapper({ initialData, shortUrl }: { initialD
         toast.success('URL copied to clipboard!');
     };
 
+    const refreshPaste = async () => {
+        setIsRefreshing(true);
+        try {
+            let res;
+            // If we are currently seeing content, it's either not protected OR already unlocked
+            // So we can use the 'password' state to 'unlock' it again silently if it's protected
+            if (initialData.isProtected) {
+                res = await unlockPaste(shortUrl, password);
+            } else {
+                res = await getPaste(shortUrl);
+            }
+
+            if (res.success) {
+                setData(res);
+                toast.success('Updated from database');
+            } else {
+                toast.error(res.error || 'Failed to refresh');
+            }
+        } catch {
+            toast.error('Unexpected error while refreshing');
+        } finally {
+            setIsRefreshing(false);
+        }
+    };
+
     /* ── Password Prompt ── */
     if (data.isProtected) {
         return (
@@ -241,6 +267,17 @@ export default function PasteClientWrapper({ initialData, shortUrl }: { initialD
                                 </>
                             ) : (
                                 <>
+                                    {/* Refresh button */}
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={refreshPaste}
+                                        disabled={isRefreshing}
+                                        className="h-7 text-emerald-600 dark:text-emerald-400 border-emerald-600/20 hover:bg-emerald-600/10 text-xs"
+                                    >
+                                        <RefreshCcw className={`w-3.5 h-3.5 mr-1 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                        Refresh
+                                    </Button>
                                     {/* Edit button */}
                                     <Button
                                         variant="ghost"

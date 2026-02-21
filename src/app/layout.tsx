@@ -3,6 +3,8 @@ import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
 import { Toaster } from '@/components/ui/sonner';
 import Navbar from '@/components/Navbar';
+import { Analytics } from '@vercel/analytics/react';
+
 
 const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 const jetbrainsMono = JetBrains_Mono({ subsets: ['latin'], variable: '--font-mono' });
@@ -33,8 +35,10 @@ export default function RootLayout({
             {children}
           </div>
           <Toaster position="bottom-right" />
+          <Analytics />
         </ThemeProvider>
       </body>
+
     </html>
   );
 }

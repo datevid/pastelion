@@ -10,14 +10,21 @@ import {
     decryptSymmetricKey,
     decryptText
 } from '@/lib/encryption';
-import Hashids from 'hashids';
+import crypto from 'crypto';
 
-// Initialize Hashids with our secure salt and our custom Base58 alphabet (no 0, O, I, l)
-const hashids = new Hashids(
-    process.env.HASHIDS_SALT || 'default-salt-fallback',
-    7, // Minimum length
-    '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz' // Base58
-);
+// BTC Base58 Alphabet (excludes 0, O, I, l)
+const BASE58_ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz';
+
+/**
+ * Generates a random slug using the BTC Base58 alphabet.
+ */
+function generateRandomSlug(length: number = 7): string {
+    let result = '';
+    for (let i = 0; i < length; i++) {
+        result += BASE58_ALPHABET[crypto.randomInt(0, BASE58_ALPHABET.length)];
+    }
+    return result;
+}
 
 export async function createPaste(data: {
     content: string;
@@ -40,38 +47,42 @@ export async function createPaste(data: {
             passHash = await hashPassword(data.password);
         }
 
-        const { data: inserted, error } = await supabase
-            .from('notes')
-            .insert({
-                content: encryptedContent,
-                symmetric_key: encryptedSymKey,
-                password_hash: passHash,
-                language: data.language || 'plaintext',
-                burn_after_reading: !!data.burnAfterReading
-            })
-            .select('id, internal_id')
-            .single();
+        let shortUrl = '';
+        let success = false;
+        let retries = 0;
+        const maxRetries = 5;
 
-        if (error) {
-            console.error('Insert Error:', error);
-            return { success: false, error: 'Database error' };
+        // Implementation of Random Base58 7 chars + UNIQUE + retry
+        while (retries < maxRetries && !success) {
+            shortUrl = generateRandomSlug(7);
+
+            const { error } = await supabase
+                .from('notes')
+                .insert({
+                    short_url: shortUrl,
+                    content: encryptedContent,
+                    symmetric_key: encryptedSymKey,
+                    password_hash: passHash,
+                    language: data.language || 'plaintext',
+                    burn_after_reading: !!data.burnAfterReading
+                });
+
+            if (!error) {
+                success = true;
+            } else if (error.code === '23505') { // Postgres Unique Violation
+                retries++;
+                console.warn(`Collision detected for slug ${shortUrl}, retrying... (${retries}/${maxRetries})`);
+            } else {
+                console.error('Insert Error:', error);
+                return { success: false, error: 'Database error' };
+            }
         }
 
-        // Generate deterministic short URL using the new internal_id
-        const newShortUrl = hashids.encode(inserted.internal_id);
-
-        // Update the paste with its short URL
-        const { error: updateError } = await supabase
-            .from('notes')
-            .update({ short_url: newShortUrl })
-            .eq('id', inserted.id);
-
-        if (updateError) {
-            console.error('Update Error (short_url):', updateError);
-            return { success: false, error: 'Failed to generate short link' };
+        if (!success) {
+            return { success: false, error: 'Failed to generate a unique short link after multiple attempts. Please try again.' };
         }
 
-        return { success: true, shortUrl: newShortUrl };
+        return { success: true, shortUrl };
     } catch (err) {
         console.error('Server Action Error:', err);
         return { success: false, error: 'Internal server error', details: String(err) };

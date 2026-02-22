@@ -8,7 +8,7 @@ Pastelion is a high-performance, premium-designed web application for sharing en
 - **Modern UI/UX**: Crafted with a sleek, dark-themed interface using Tailwind CSS and Framer Motion for smooth transitions.
 - **Dynamic Theming**: Support for both Dark and Light modes with seamless synchronization with system preferences.
 - **Monaco Editor Integration**: Provides a native IDE experience with syntax highlighting for dozens of languages.
-- **Custom URL System**: Generates short, efficient 7-character URLs (Base62) similar to Bitly.
+- **Custom URL System**: Generates short, efficient 7-character URLs (Base58) with a random, scalable collision-retry mechanism.
 - **Live Editing**: Securely edit and save changes to existing pastes if you have the correct password.
 
 ---

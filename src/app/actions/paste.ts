@@ -10,6 +10,14 @@ import {
     decryptSymmetricKey,
     decryptText
 } from '@/lib/encryption';
+import Hashids from 'hashids';
+
+// Initialize Hashids with our secure salt and our custom Base58 alphabet (no 0, O, I, l)
+const hashids = new Hashids(
+    process.env.HASHIDS_SALT || 'default-salt-fallback',
+    7, // Minimum length
+    '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz' // Base58
+);
 
 export async function createPaste(data: {
     content: string;
@@ -33,7 +41,7 @@ export async function createPaste(data: {
         }
 
         const { data: inserted, error } = await supabase
-            .from('pastes')
+            .from('notes')
             .insert({
                 content: encryptedContent,
                 symmetric_key: encryptedSymKey,
@@ -41,7 +49,7 @@ export async function createPaste(data: {
                 language: data.language || 'plaintext',
                 burn_after_reading: !!data.burnAfterReading
             })
-            .select('short_url')
+            .select('id, internal_id')
             .single();
 
         if (error) {
@@ -49,7 +57,21 @@ export async function createPaste(data: {
             return { success: false, error: 'Database error' };
         }
 
-        return { success: true, shortUrl: inserted.short_url };
+        // Generate deterministic short URL using the new internal_id
+        const newShortUrl = hashids.encode(inserted.internal_id);
+
+        // Update the paste with its short URL
+        const { error: updateError } = await supabase
+            .from('notes')
+            .update({ short_url: newShortUrl })
+            .eq('id', inserted.id);
+
+        if (updateError) {
+            console.error('Update Error (short_url):', updateError);
+            return { success: false, error: 'Failed to generate short link' };
+        }
+
+        return { success: true, shortUrl: newShortUrl };
     } catch (err) {
         console.error('Server Action Error:', err);
         return { success: false, error: 'Internal server error', details: String(err) };
@@ -59,7 +81,7 @@ export async function createPaste(data: {
 export async function getPaste(shortUrl: string) {
     try {
         const { data, error } = await supabase
-            .from('pastes')
+            .from('notes')
             .select('*')
             .eq('short_url', shortUrl)
             .single();
@@ -84,7 +106,7 @@ export async function getPaste(shortUrl: string) {
 
         // If burn after reading, delete immediately
         if (data.burn_after_reading) {
-            await supabase.from('pastes').delete().eq('id', data.id);
+            await supabase.from('notes').delete().eq('id', data.id);
         }
 
         return {
@@ -103,7 +125,7 @@ export async function getPaste(shortUrl: string) {
 export async function unlockPaste(shortUrl: string, password: string) {
     try {
         const { data, error } = await supabase
-            .from('pastes')
+            .from('notes')
             .select('*')
             .eq('short_url', shortUrl)
             .single();
@@ -125,7 +147,7 @@ export async function unlockPaste(shortUrl: string, password: string) {
         const decryptedContent = decryptText(data.content, symKey);
 
         if (data.burn_after_reading) {
-            await supabase.from('pastes').delete().eq('id', data.id);
+            await supabase.from('notes').delete().eq('id', data.id);
         }
 
         return {
@@ -153,7 +175,7 @@ export async function updatePaste(data: {
         }
 
         const { data: pasteRow, error } = await supabase
-            .from('pastes')
+            .from('notes')
             .select('*')
             .eq('short_url', data.shortUrl)
             .single();
@@ -180,7 +202,7 @@ export async function updatePaste(data: {
         const encryptedNewContent = encryptText(data.newContent, symKey);
 
         const { error: updateError, count } = await supabase
-            .from('pastes')
+            .from('notes')
             .update({
                 content: encryptedNewContent,
                 language: data.newLanguage || pasteRow.language,

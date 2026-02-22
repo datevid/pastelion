@@ -57,7 +57,7 @@ export async function createPaste(data: {
             shortUrl = generateRandomSlug(7);
 
             const { error } = await supabase
-                .from('notes')
+                .from('pastes')
                 .insert({
                     short_url: shortUrl,
                     content: encryptedContent,
@@ -92,7 +92,7 @@ export async function createPaste(data: {
 export async function getPaste(shortUrl: string) {
     try {
         const { data, error } = await supabase
-            .from('notes')
+            .from('pastes')
             .select('*')
             .eq('short_url', shortUrl)
             .single();
@@ -117,7 +117,7 @@ export async function getPaste(shortUrl: string) {
 
         // If burn after reading, delete immediately
         if (data.burn_after_reading) {
-            await supabase.from('notes').delete().eq('id', data.id);
+            await supabase.from('pastes').delete().eq('id', data.id);
         }
 
         return {
@@ -136,7 +136,7 @@ export async function getPaste(shortUrl: string) {
 export async function unlockPaste(shortUrl: string, password: string) {
     try {
         const { data, error } = await supabase
-            .from('notes')
+            .from('pastes')
             .select('*')
             .eq('short_url', shortUrl)
             .single();
@@ -158,7 +158,7 @@ export async function unlockPaste(shortUrl: string, password: string) {
         const decryptedContent = decryptText(data.content, symKey);
 
         if (data.burn_after_reading) {
-            await supabase.from('notes').delete().eq('id', data.id);
+            await supabase.from('pastes').delete().eq('id', data.id);
         }
 
         return {
@@ -186,7 +186,7 @@ export async function updatePaste(data: {
         }
 
         const { data: pasteRow, error } = await supabase
-            .from('notes')
+            .from('pastes')
             .select('*')
             .eq('short_url', data.shortUrl)
             .single();
@@ -213,7 +213,7 @@ export async function updatePaste(data: {
         const encryptedNewContent = encryptText(data.newContent, symKey);
 
         const { error: updateError, count } = await supabase
-            .from('notes')
+            .from('pastes')
             .update({
                 content: encryptedNewContent,
                 language: data.newLanguage || pasteRow.language,

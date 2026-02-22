@@ -14,9 +14,9 @@ Este modelo es altamente escalable porque:
 
 ### Fase 1: Modificaciones en la Base de Datos (Supabase)
 1. **Asegurar Restricción de Unicidad:**
-   La columna `short_url` en la tabla `notes` debe tener una restricción `UNIQUE`.
+   La columna `short_url` en la tabla `pastes` debe tener una restricción `UNIQUE`.
    ```sql
-   ALTER TABLE notes ADD CONSTRAINT notes_short_url_key UNIQUE (short_url);
+   ALTER TABLE pastes ADD CONSTRAINT pastes_short_url_key UNIQUE (short_url);
    ```
 
 ### Fase 2: Configuración del Proyecto (Next.js)
